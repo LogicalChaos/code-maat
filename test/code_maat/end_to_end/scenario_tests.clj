@@ -28,33 +28,33 @@
 (def ^:const empty-hg-file "./test/code_maat/end_to_end/empty.hg")
 (def ^:const empty-p4-file "./test/code_maat/end_to_end/empty.p4")
 
-(defn- svn-csv-options
-  [analysis]
+(def shared-options
   (merge
    test-data/options-with-low-thresholds
-   {:version-control "svn"
+   {:age-time-now "2015-03-01"}))
+
+(defn- make-options-for
+  [vcs analysis]
+  (merge
+   shared-options
+   {:version-control vcs
     :analysis analysis}))
+
+(defn- svn-csv-options
+  [analysis]
+  (make-options-for "svn" analysis))
 
 (defn- git-options
   [analysis]
-   (merge
-   test-data/options-with-low-thresholds
-   {:version-control "git"
-    :analysis analysis}))
+  (make-options-for "git" analysis))
 
 (defn- hg-options
   [analysis]
-   (merge
-   test-data/options-with-low-thresholds
-   {:version-control "hg"
-    :analysis analysis}))
+  (make-options-for "hg" analysis))
 
 (defn- p4-options
   [analysis]
-   (merge
-   test-data/options-with-low-thresholds
-   {:version-control "p4"
-    :analysis analysis}))
+  (make-options-for "p4" analysis))
 
 (def-data-driven-with-vcs-test analysis-of-authors
   [[svn-log-file (svn-csv-options "authors")]
@@ -102,24 +102,34 @@
 ;;; the output.
 (deftest svn-identity-analysis-contains-additional-info
   (is (= (run-with-str-output svn-log-file (svn-csv-options "identity"))
-         "entity,date,author,action,rev\n/Infrastrucure/Network/Connection.cs,2013-02-08T11:46:13.844538Z,APT,M,2\n/Presentation/Status/ClientPresenter.cs,2013-02-08T11:46:13.844538Z,APT,M,2\n/Infrastrucure/Network/Connection.cs,2013-02-07T11:46:13.844538Z,XYZ,M,1\n")))
+         "entity,date,author,action,rev\n/Infrastrucure/Network/Connection.cs,2013-02-08,APT,M,2\n/Presentation/Status/ClientPresenter.cs,2013-02-08,APT,M,2\n/Infrastrucure/Network/Connection.cs,2013-02-07,XYZ,M,1\n")))
 
 ;;; The git, Mercurical, and Perforce parsers do not include the
 ;;; 'action' tag that we have in the current SVN data.
 ;;; I'm likely to add it later. For now, just document
 ;;; the behavior here.
+
 (deftest hg-identity-analysis
   (is (= (run-with-str-output hg-log-file (hg-options "identity"))
          "author,rev,date,entity,message\nAPT,2,2013-02-08,/Infrastrucure/Network/Connection.cs,\nAPT,2,2013-02-08,/Presentation/Status/ClientPresenter.cs,\nXYZ,1,2013-02-07,/Infrastrucure/Network/Connection.cs,\n")))
 
 (deftest p4-identity-analysis
   (is (= (run-with-str-output p4-log-file (p4-options "identity"))
-         "author,rev,date,entity,message\nAPT,2,2013/02/08,/Infrastrucure/Network/Connection.cs,\nAPT,2,2013/02/08,/Presentation/Status/ClientPresenter.cs,\nXYZ,1,2013/02/07,/Infrastrucure/Network/Connection.cs,\n")))
+         "author,rev,date,entity,message\nAPT,2,2013-02-08,/Infrastrucure/Network/Connection.cs,\nAPT,2,2013-02-08,/Presentation/Status/ClientPresenter.cs,\nXYZ,1,2013-02-07,/Infrastrucure/Network/Connection.cs,\n")))
 
 (deftest git-identity-analysis
   "Git included additional churn info."
   (is (= (run-with-str-output git-log-file (git-options "identity"))
          "loc-deleted,loc-added,author,rev,date,entity,message\n2,1,APT,2,2013-02-08,/Infrastrucure/Network/Connection.cs,git: authors and revisions implemented\n4,3,APT,2,2013-02-08,/Presentation/Status/ClientPresenter.cs,git: authors and revisions implemented\n2,18,XYZ,1,2013-02-07,/Infrastrucure/Network/Connection.cs,Report connection status\n")))
+
+;; All age tests are run against a fixed 'now' time specified in the options.
+(def-data-driven-with-vcs-test analysis-of-code-age
+  [[svn-log-file (svn-csv-options "age")]
+   [git-log-file (git-options "age")]
+   [p4-log-file (p4-options "age")]
+   [hg-log-file (hg-options "age")]]
+  (is (= (run-with-str-output log-file options)
+         "entity,age-months\n/Infrastrucure/Network/Connection.cs,24\n/Presentation/Status/ClientPresenter.cs,24\n")))
 
 (deftest reports-invalid-arguments
   (testing "Non-existent input file"
@@ -166,3 +176,11 @@
    [empty-hg-file (hg-options "communication")]]
   (is (= (run-with-str-output log-file options)
          "author,peer,shared,average,strength\n")))
+
+(def-data-driven-with-vcs-test analysis-of-code-age-with-empty-log
+  [[empty-log-file (svn-csv-options "age")]
+   [empty-git-file (git-options "age")]
+   [empty-p4-file (p4-options "age")]
+   [empty-hg-file (hg-options "age")]]
+  (is (= (run-with-str-output log-file options)
+         "entity,age-months\n")))
