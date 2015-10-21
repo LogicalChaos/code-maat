@@ -1,4 +1,4 @@
-;;; Copyright (C) 2013 Adam Tornhill
+;;; Copyright (C) 2013-2015 Adam Tornhill
 ;;;
 ;;; Distributed under the GNU General Public License v3.0,
 ;;; see http://www.gnu.org/licenses/gpl.html
@@ -11,12 +11,13 @@
 
 (def cli-options
   [["-l" "--log LOG" "Log file with input data"]
-   ["-c" "--version-control VCS" "Input vcs module type: supports svn, git, hg, or p4"]
+   ["-c" "--version-control VCS" "Input vcs module type: supports svn, git, git2, hg, or p4"]
    ["-a" "--analysis ANALYSIS"
-    "The analysis to run (authors, revisions, coupling, soc, summary, churn, identity, etc)"
+    (str "The analysis to run (" (app/analysis-names)  ")")
     :default "authors"]
    [nil "--input-encoding INPUT-ENCODING" "Specify an encoding other than UTF-8 for the log file"]
    ["-r" "--rows ROWS" "Max rows in output" :parse-fn #(Integer/parseInt %)]
+   ["-o" "--outfile OUTFILE" "Write the result to the given file name"]
    ["-g" "--group GROUP" "A file with a pre-defined set of layers. The data will be aggregated according to the group of layers."]
    ["-n" "--min-revs MIN-REVS" "Minimum number of revisions to include an entity in the analysis"
     :default 5 :parse-fn #(Integer/parseInt %)]
@@ -37,6 +38,7 @@
 
 (defn- usage [options-summary]
   (->> ["This is Code Maat, a program used to collect statistics from a VCS."
+        "Version: 0.9.2-SNAPSHOT"
         ""
         "Usage: program-name -l log-file [options]"
         ""

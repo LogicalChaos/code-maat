@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/adamtornhill/code-maat.png)](https://travis-ci.org/adamtornhill/code-maat)
+
 # Code Maat
 
 Code Maat is a command line tool used to mine and analyze data from version-control systems (VCS).
@@ -48,6 +50,10 @@ To analyze our VCS data we need to define a temporal period of interest. Over ti
 
           git log --pretty=format:'[%h] %aN %ad %s' --date=short --numstat --after=YYYY-MM-DD
 
+Note that there's a second supported Git format as well, imaginatively named `git2`. This format is more tolerant and faster to parse, so please prefer it over the plain `git` format described above:
+
+          git log --all -M -C --numstat --date=short --pretty=format:'--%h--%ad--%an' --no-renames
+
 #### Generate a Mercurial log file using the following command:
 
           hg log --template "rev: {rev} author: {author} date: {date|shortdate} files:\n{files %'{file}\n'}\n" --date ">YYYY-MM-DD"
@@ -68,21 +74,28 @@ If you've built a standalone jar (`lein uberjar`), run it with a simple java inv
 
 When invoked with `-h`, Code Maat prints its usage:
 
-             adam$ java -jar code-maat-0.8.6.jar
+             adam$ java -jar code-maat-0.9.0.jar
              This is Code Maat, a program used to collect statistics from a VCS.
+             Version: 0.9.0-SNAPSHOT
              
-             Usage: program-name log-file [options]
+             Usage: program-name -l log-file [options]
              
              Options:
-             -l, --log LOG                                   Log file with input data
-             -c, --version-control VCS                       Input vcs module type: supports svn, git, hg, or p4
-             -a, --analysis ANALYSIS                authors  The analysis to run (authors, revisions, coupling, summary, churn, identity)
-             -r, --rows ROWS                        10       Max rows in output
-             -n, --min-revs MIN-REVS                5        Minimum number of revisions to include an entity in the analysis
-             -m, --min-shared-revs MIN-SHARED-REVS  5        Minimum number of shared revisions to include an entity in the analysis
-             -i, --min-coupling MIN-COUPLING        50       Minimum degree of coupling (in percentage) to consider
-             -x, --max-coupling MAX-COUPLING        100      Maximum degree of coupling (in percentage) to consider
-             -h, --help
+               -l, --log LOG                                         Log file with input data
+               -c, --version-control VCS                             Input vcs module type: supports svn, git, git2, hg, or p4
+               -a, --analysis ANALYSIS                      authors  The analysis to run (abs-churn, age, author-churn, authors, communication, coupling, entity-churn, entity-effort, entity-ownership, fragmentation, identity, main-dev, main-dev-by-revs, messages, refactoring-main-dev, revisions, soc, summary)
+              --input-encoding INPUT-ENCODING                        Specify an encoding other than UTF-8 for the log file
+               -r, --rows ROWS                                       Max rows in output
+               -g, --group GROUP                                     A file with a pre-defined set of layers. The data will be aggregated according to the group of layers.
+               -n, --min-revs MIN-REVS                      5        Minimum number of revisions to include an entity in the analysis
+               -m, --min-shared-revs MIN-SHARED-REVS        5        Minimum number of shared revisions to include an entity in the analysis
+               -i, --min-coupling MIN-COUPLING              30       Minimum degree of coupling (in percentage) to consider
+               -x, --max-coupling MAX-COUPLING              100      Maximum degree of coupling (in percentage) to consider
+               -s, --max-changeset-size MAX-CHANGESET-SIZE  30       Maximum number of modules in a change set if it shall be included in a coupling analysis
+               -e, --expression-to-match MATCH-EXPRESSION            A regex to match against commit messages. Used with -messages analyses
+               -t, --temporal-period TEMPORAL-PERIOD                 Instructs Code Maat to consider all commits during the same day as a single, logical commit
+               -d, --age-time-now AGE-TIME_NOW                       Specify a date as YYYY-MM-dd that counts as time zero when doing a code age analysis
+               -h, --help
 
 ### Optional: specify an encoding
 
@@ -92,7 +105,7 @@ By default, Code Maat expects your log files to be UTF-8. If you use another enc
 
 When starting out, I find it useful to get an overview of the mined data. With the `summary` analysis, Code Maat produces such an overview:
 
-   	   java -jar code-maat-0.8.6.jar -l logfile.log -c git -a summary
+   	   java -jar code-maat-0.9.0.jar -l logfile.log -c git -a summary
 
 The resulting output is on csv format:
 
@@ -102,11 +115,15 @@ The resulting output is on csv format:
               number-of-entities-changed, 3397
               number-of-authors,            79
 
+If you use the second Git format, just specify `git2` instead:
+
+   	   java -jar code-maat-0.9.0.jar -l logfile2.log -c git2 -a summary
+
 #### Mining organizational metrics
 
 By default, Code Maat runs an analysis on the number of authors per module. The authors analysis is based on the idea that the more developers working on a module, the larger the communication challenges. The analysis is invoked with the following command:
 
-   	   java -jar code-maat-0.8.6.jar -l logfile.log -c git
+   	   java -jar code-maat-0.9.0.jar -l logfile.log -c git
 
 The resulting output is on CSV format:
 
@@ -122,7 +139,7 @@ In example above, the first column gives us the name of module, the second the t
 
 Logical coupling refers to modules that tend to change together. Modules that are logically coupled have a hidden, implicit dependency between them such that a change to one of them leads to a predictable change in the coupled module. To analyze the logical coupling in a system, invoke Code Maat with the following arguments:
 
-              java -jar code-maat-0.8.6.jar -l logfile.log -c git -a coupling
+              java -jar code-maat-0.9.0.jar -l logfile.log -c git -a coupling
 
 The resulting output is on CSV format:
 
@@ -139,7 +156,7 @@ The change frequency of code is a factor that should (but rarely do) drive the e
 
 One way to measure the stability of a software architecture is by a code age analysis:
 
-              java -jar code-maat-0.8.6.jar -l logfile.log -c git -a age
+              java -jar code-maat-0.9.0.jar -l logfile.log -c git -a age
 
 The `age` analysis grades each module based on the date of last change. The measurement unit is age in months. Here's how the result may look:
 

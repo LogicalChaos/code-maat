@@ -6,6 +6,7 @@
 (ns code-maat.app.app
   (:require [code-maat.parsers.svn :as svn]
             [code-maat.parsers.git :as git]
+            [code-maat.parsers.git2 :as git2]
             [code-maat.parsers.mercurial :as hg]
             [code-maat.parsers.perforce :as p4]
             [code-maat.parsers.xml :as xml]
@@ -69,13 +70,18 @@
    "messages" commits/by-word-frequency
    "age" age/by-age})
 
+(defn analysis-names
+  []
+  (->>
+   (keys supported-analysis)
+   sort
+   (string/join ", ")))
+
 (defn- fail-for-invalid-analysis
   [requested-analysis]
-  (let [valid-analyses (keys supported-analysis)
-        printable-analyses (string/join ", " valid-analyses)]
-    (throw (IllegalArgumentException.
-            (str "Invalid analysis requested: " requested-analysis ". "
-                 "Valid options are: " printable-analyses)))))
+  (throw (IllegalArgumentException.
+          (str "Invalid analysis requested: " requested-analysis ". "
+               "Valid options are: " (analysis-names)))))
 
 (defn- make-analysis
   "Returns the analysis to run while closing over the options.
@@ -114,10 +120,18 @@
    "svn"))
 
 (defn- git->modifications
+  "Legacy parser for git. Maintained for backwards compatibility with 
+   the examples in Your Code as a Crime Scene. Prefer the git2 parser instead."
   [logfile-name options]
   (run-parser-in-error-handling-context
    #(git/parse-log logfile-name options)
    "git"))
+
+(defn- git2->modifications
+  [logfile-name options]
+  (run-parser-in-error-handling-context
+   #(git2/parse-log logfile-name options)
+   "git2"))
 
 (defn- p4->modifications
   [logfile-name options]
@@ -128,13 +142,14 @@
 (defn- parser-from
   [{:keys [version-control]}]
   (case version-control
-    "svn" svn-xml->modifications
-    "git" git->modifications
-    "hg"  hg->modifications
-    "p4"  p4->modifications
+    "svn"  svn-xml->modifications
+    "git"  git->modifications 
+    "git2" git2->modifications
+    "hg"   hg->modifications
+    "p4"   p4->modifications
     (throw (IllegalArgumentException.
             (str "Invalid --version-control specified: " version-control
-                 ". Supported options are: svn, git, hg, or p4.")))))
+                 ". Supported options are: svn, git, git2, hg, or p4.")))))
 
 (defn- aggregate-on-boundaries
   "The individual changes may be aggregated into layers
@@ -157,10 +172,15 @@
     (time-grouper/run commits time-period)
     commits))
 
-(defn- make-output [options]
+(defn- make-stdout-output [options]
   (if-let [n-out-rows (:rows options)]
     #(csv-output/write-to :stream % n-out-rows)
     #(csv-output/write-to :stream %)))
+
+(defn- make-output [options]
+  (if-let [output-file (:outfile options)]
+    #(csv-output/write-to-file output-file :stream %)
+    (make-stdout-output options)))
 
 (defn- throw-internal-error [e]
   (throw (IllegalArgumentException.
